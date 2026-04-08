@@ -7,7 +7,7 @@ const PAGE_SIZE = 100;
 
 export default function App() {
   // ── Filter state ───────────────────────────────────────
-  const [selectedStates,   setSelectedStates]   = useState([]); // array for multi-select
+  const [selectedStates,   setSelectedStates]   = useState([]);
   const [selectedHospital, setSelectedHospital] = useState(null);
   const [selectedDoctor,   setSelectedDoctor]   = useState(null);
   const [productFilter,    setProductFilter]    = useState("All");
@@ -45,10 +45,7 @@ export default function App() {
 
   // ── Load hospitals on demand ───────────────────────────
   useEffect(() => {
-    if (hospSearch.length < 2 && selectedStates.length === 0) {
-      setAllHospitals([]);
-      return;
-    }
+    if (hospSearch.length < 2 && selectedStates.length === 0) { setAllHospitals([]); return; }
     let q = supabase.from("distinct_hospitals").select("hospital").limit(200);
     if (hospSearch.length >= 2) q = q.ilike("hospital", `%${hospSearch}%`);
     if (selectedStates.length > 0) q = q.in("state", selectedStates);
@@ -59,10 +56,7 @@ export default function App() {
 
   // ── Load doctors on demand ─────────────────────────────
   useEffect(() => {
-    if (docSearch.length < 2 && selectedStates.length === 0 && !selectedHospital) {
-      setAllDoctors([]);
-      return;
-    }
+    if (docSearch.length < 2 && selectedStates.length === 0 && !selectedHospital) { setAllDoctors([]); return; }
     let q = supabase.from("distinct_doctors").select("doctor").limit(200);
     if (docSearch.length >= 2) q = q.ilike("doctor", `%${docSearch}%`);
     if (selectedStates.length > 0) q = q.in("state", selectedStates);
@@ -79,7 +73,7 @@ export default function App() {
   const groupLabel  = isDocView ? "Doctor" : "Hospital";
   const regionLabel = isDocView ? "Region" : "Location";
 
-  // ── Apply state filter helper ──────────────────────────
+  // ── State filter helper ────────────────────────────────
   const applyStateFilter = (q) => {
     if (selectedStates.length === 1) return q.eq("state", selectedStates[0]);
     if (selectedStates.length > 1)  return q.in("state", selectedStates);
@@ -88,51 +82,34 @@ export default function App() {
 
   // ── Load true totals ───────────────────────────────────
   const loadTotals = useCallback(async () => {
-    // No filters — load national totals
     if (selectedStates.length === 0 && !selectedHospital && !selectedDoctor) {
-      if (productFilter === "All") {
-        const { data } = await supabase.from("national_totals").select("product, total_qty");
-        if (data) {
-          setTotals({
-            totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0),
-            kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
-            hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
-          });
-        }
-      } else {
-        const { data } = await supabase.from("national_totals").select("product, total_qty").eq("product", productFilter);
-        if (data) {
-          setTotals({
-            totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0),
-            kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
-            hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
-          });
-        }
-      }
+      const { data } = productFilter !== "All"
+        ? await supabase.from("national_totals").select("product, total_qty").eq("product", productFilter)
+        : await supabase.from("national_totals").select("product, total_qty");
+      if (data) setTotals({
+        totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0),
+        kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
+        hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
+      });
       return;
     }
-
-    // Filtered totals
     let q = supabase.from("filter_totals").select("product, total_qty");
     q = applyStateFilter(q);
     if (selectedHospital)        q = q.eq("hospital", selectedHospital);
     if (selectedDoctor)          q = q.eq("doctor",   selectedDoctor);
     if (productFilter !== "All") q = q.eq("product",  productFilter);
     const { data } = await q;
-    if (data) {
-      setTotals({
-        totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0),
-        kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
-        hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
-      });
-    }
+    if (data) setTotals({
+      totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0),
+      kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
+      hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
+    });
   }, [selectedStates, selectedHospital, selectedDoctor, productFilter]); // eslint-disable-line
 
   useEffect(() => { loadTotals(); }, [loadTotals]);
 
   // ── Load paginated results ─────────────────────────────
   const loadResults = useCallback(async () => {
-    // Show national results even with no filter selected
     setLoading(true);
     setError(null);
     try {
@@ -140,10 +117,7 @@ export default function App() {
       const to   = (page + 1) * PAGE_SIZE - 1;
 
       if (productFilter !== "All") {
-        let rq = supabase
-          .from("surgeon_data")
-          .select(`${nameKey}, state, region, hospital_address, qty`)
-          .eq("product", productFilter);
+        let rq = supabase.from("surgeon_data").select(`${nameKey}, state, region, hospital_address, qty`).eq("product", productFilter);
         rq = applyStateFilter(rq);
         if (selectedHospital) rq = rq.eq("hospital", selectedHospital);
         if (selectedDoctor)   rq = rq.eq("doctor",   selectedDoctor);
@@ -151,28 +125,21 @@ export default function App() {
         if (raw) {
           const map = {};
           raw.forEach(r => {
-            const k = r[nameKey];
-            if (!k) return;
+            const k = r[nameKey]; if (!k) return;
             if (!map[k]) map[k] = { [nameKey]: k, state: r.state, region: r.region, hospital_address: r.hospital_address, total_qty: 0, knee_qty: 0, hip_qty: 0 };
             map[k].total_qty += r.qty || 0;
           });
-          let arr = Object.values(map).sort((a, b) => sortDir === "desc" ? b[sortCol] - a[sortCol] : a[sortCol] - b[sortCol]);
+          const arr = Object.values(map).sort((a, b) => sortDir === "desc" ? b[sortCol] - a[sortCol] : a[sortCol] - b[sortCol]);
           setTotalCount(arr.length);
           setRows(arr.slice(from, to + 1));
-          setLoading(false);
-          return;
+          setLoading(false); return;
         }
       }
 
-      let q = supabase
-        .from(statsView)
-        .select("*", { count: "exact" })
-        .order(sortCol, { ascending: sortDir === "asc" })
-        .range(from, to);
+      let q = supabase.from(statsView).select("*", { count: "exact" }).order(sortCol, { ascending: sortDir === "asc" }).range(from, to);
       q = applyStateFilter(q);
       if (selectedHospital) q = q.eq("hospital", selectedHospital);
       if (selectedDoctor)   q = q.eq("doctor",   selectedDoctor);
-
       const { data, count, error: err } = await q;
       if (err) throw err;
       setRows(data || []);
@@ -190,8 +157,7 @@ export default function App() {
     if (expandedRow === name) { setExpandedRow(null); return; }
     if (expandedDetail[name]) { setExpandedRow(name); return; }
     let q = supabase.from("surgeon_data").select("surgery, qty");
-    if (isDocView) q = q.eq("doctor",   name);
-    else           q = q.eq("hospital", name);
+    if (isDocView) q = q.eq("doctor", name); else q = q.eq("hospital", name);
     q = applyStateFilter(q);
     if (selectedHospital) q = q.eq("hospital", selectedHospital);
     if (selectedDoctor)   q = q.eq("doctor",   selectedDoctor);
@@ -244,6 +210,7 @@ export default function App() {
   const filtStates = allStates.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase()));
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasFilter  = selectedStates.length > 0 || selectedHospital || selectedDoctor;
+  const isNational = selectedStates.length === 0 && !selectedHospital && !selectedDoctor;
 
   return (
     <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
@@ -259,24 +226,21 @@ export default function App() {
       <div style={{ padding: "20px 24px", maxWidth: 1200, margin: "0 auto" }}>
         {/* Filter panels */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 16 }}>
-          {/* State panel */}
+          {/* State */}
           <div style={{ background: "#fff", borderRadius: 10, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
               State {selectedStates.length > 0 && <span style={{ color: "#2563eb" }}>({selectedStates.length} selected)</span>}
             </div>
-            <input value={stateSearch} onChange={e => setStateSearch(e.target.value)}
-              placeholder="Search states…"
+            <input value={stateSearch} onChange={e => setStateSearch(e.target.value)} placeholder="Search states…"
               style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, marginBottom: 8, boxSizing: "border-box", outline: "none" }} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 130, overflowY: "auto" }}>
               {filtStates.map(item => (
-                <FilterBtn key={item} val={item} active={selectedStates.includes(item)}
-                  onClick={() => toggleState(item)}
-                  color="#2563eb" />
+                <FilterBtn key={item} val={item} active={selectedStates.includes(item)} onClick={() => toggleState(item)} color="#2563eb" />
               ))}
             </div>
           </div>
 
-          {/* Hospital panel */}
+          {/* Hospital */}
           <div style={{ background: "#fff", borderRadius: 10, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Hospital</div>
             <input value={hospSearch} onChange={e => setHospSearch(e.target.value)}
@@ -292,7 +256,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Doctor panel */}
+          {/* Doctor */}
           <div style={{ background: "#fff", borderRadius: 10, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Doctor</div>
             <input value={docSearch} onChange={e => setDocSearch(e.target.value)}
@@ -333,9 +297,9 @@ export default function App() {
         {/* KPI cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 18 }}>
           {[
-            { label: selectedStates.length === 0 && !selectedHospital && !selectedDoctor ? "Total Cases (National)" : "Total Cases", val: fmtN(totals.totalQty), color: "#2563eb" },
-            { label: selectedStates.length === 0 && !selectedHospital && !selectedDoctor ? "Knee Cases (National)" : "Knee Cases",  val: fmtN(totals.kneeQty),  color: "#7c3aed" },
-            { label: selectedStates.length === 0 && !selectedHospital && !selectedDoctor ? "Hip Cases (National)"  : "Hip Cases",   val: fmtN(totals.hipQty),   color: "#059669" },
+            { label: isNational ? "Total Cases (National)" : "Total Cases", val: fmtN(totals.totalQty), color: "#2563eb" },
+            { label: isNational ? "Knee Cases (National)"  : "Knee Cases",  val: fmtN(totals.kneeQty),  color: "#7c3aed" },
+            { label: isNational ? "Hip Cases (National)"   : "Hip Cases",   val: fmtN(totals.hipQty),   color: "#059669" },
           ].map(k => (
             <div key={k.label} style={{ background: "#fff", borderRadius: 10, padding: "14px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `4px solid ${k.color}` }}>
               <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{k.label}</div>
@@ -385,9 +349,9 @@ export default function App() {
               </thead>
               <tbody>
                 {rows.map((row, i) => {
-                  const name = row[nameKey];
-                  const isPaymentOpen = paymentDoctor === name;
-                  const detail = expandedDetail[name];
+                  const name           = row[nameKey];
+                  const detail         = expandedDetail[name];
+                  const isPaymentOpen  = paymentDoctor === name;
                   return (
                     <>
                       <tr key={name + i} style={{ borderTop: "1px solid #f1f5f9", background: isPaymentOpen ? "#f0f9ff" : i % 2 === 0 ? "#fff" : "#fafafa" }}>
@@ -442,6 +406,11 @@ export default function App() {
           {!loading && rows.length === 0 && <div style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>No results match your current filters.</div>}
           {error && <div style={{ padding: 20, textAlign: "center", color: "#991b1b", fontSize: 13 }}>{error}</div>}
         </div>
+
+        {/* Standalone CMS section when a specific doctor is selected */}
+        {selectedDoctor && (
+          <PaymentPanel doctor={selectedDoctor} />
+        )}
       </div>
     </div>
   );
