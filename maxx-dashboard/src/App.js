@@ -218,7 +218,7 @@ export default function App() {
       <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%)", padding: "16px 28px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>🦴 Knee & Hip Volume Dashboard</div>
-          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>Sales View · Maxx Orthopedics</div>
+          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>Total Industry Data · Maxx Orthopedics</div>
         </div>
         <button onClick={() => { loadResults(); loadTotals(); }} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>↻ Refresh</button>
       </div>
