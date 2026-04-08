@@ -3,11 +3,16 @@ import { useState, useEffect } from "react";
 const fmtUSD = n => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 async function fetchPayments(firstName, lastName) {
-  const cmsUrl = `https://openpaymentsdata.cms.gov/resource/5ia3-vtt7.json?$where=covered_recipient_last_name=%27${lastName}%27%20AND%20covered_recipient_first_name=%27${firstName}%27&$limit=5000&$select=applicable_manufacturer_or_applicable_gpo_making_payment_name,total_amount_of_payment_usdollars,nature_of_payment_or_transfer_of_value`;
-  
-  const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(cmsUrl)}`;
-  
-  const resp = await fetch(proxiedUrl);
+  const where = `covered_recipient_last_name='${lastName}' AND covered_recipient_first_name='${firstName}'`;
+  const select = [
+    "applicable_manufacturer_or_applicable_gpo_making_payment_name",
+    "total_amount_of_payment_usdollars",
+    "nature_of_payment_or_transfer_of_value",
+  ].join(",");
+
+  const url = `https://openpaymentsdata.cms.gov/resource/5ia3-vtt7.json?$where=${encodeURIComponent(where)}&$select=${encodeURIComponent(select)}&$limit=5000`;
+
+  const resp = await fetch(url);
   if (!resp.ok) throw new Error("API error");
   return resp.json();
 }
