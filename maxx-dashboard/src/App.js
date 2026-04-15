@@ -1,11 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import PaymentPanel from "./components/PaymentPanel";
+import { useAuth } from "./context/AuthContext";
+import LoginPage from "./pages/LoginPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const fmtN = n => n == null ? "-" : Number(n).toLocaleString();
 const PAGE_SIZE = 100;
 
 export default function App() {
+  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const [showAdmin, setShowAdmin] = useState(false);
+
   // ── Filter state ───────────────────────────────────────
   const [selectedStates,   setSelectedStates]   = useState([]);
   const [selectedHospital, setSelectedHospital] = useState(null);
@@ -37,34 +43,45 @@ export default function App() {
 
   // ── Load states on mount ───────────────────────────────
   useEffect(() => {
+    if (!user || !profile || profile.role === "pending") return;
     supabase.from("distinct_states").select("state")
       .then(({ data }) => {
-        if (data) setAllStates(data.map(r => r.state).filter(Boolean).sort());
+        if (data) {
+          let states = data.map(r => r.state).filter(Boolean).sort();
+          if (profile.role === "regional" && profile.allowed_states?.length) {
+            states = states.filter(s => profile.allowed_states.includes(s));
+          }
+          setAllStates(states);
+        }
       });
-  }, []);
+  }, [user, profile]);
 
   // ── Load hospitals on demand ───────────────────────────
   useEffect(() => {
+    if (!user || !profile || profile.role === "pending") return;
     if (hospSearch.length < 2 && selectedStates.length === 0) { setAllHospitals([]); return; }
     let q = supabase.from("distinct_hospitals").select("hospital").limit(200);
     if (hospSearch.length >= 2) q = q.ilike("hospital", `%${hospSearch}%`);
     if (selectedStates.length > 0) q = q.in("state", selectedStates);
+    else if (profile.role === "regional" && profile.allowed_states?.length) q = q.in("state", profile.allowed_states);
     q.then(({ data }) => {
       if (data) setAllHospitals([...new Set(data.map(r => r.hospital))].filter(Boolean).sort());
     });
-  }, [hospSearch, selectedStates]);
+  }, [hospSearch, selectedStates, user, profile]);
 
   // ── Load doctors on demand ─────────────────────────────
   useEffect(() => {
+    if (!user || !profile || profile.role === "pending") return;
     if (docSearch.length < 2 && selectedStates.length === 0 && !selectedHospital) { setAllDoctors([]); return; }
     let q = supabase.from("distinct_doctors").select("doctor").limit(200);
     if (docSearch.length >= 2) q = q.ilike("doctor", `%${docSearch}%`);
     if (selectedStates.length > 0) q = q.in("state", selectedStates);
+    else if (profile.role === "regional" && profile.allowed_states?.length) q = q.in("state", profile.allowed_states);
     if (selectedHospital) q = q.eq("hospital", selectedHospital);
     q.then(({ data }) => {
       if (data) setAllDoctors([...new Set(data.map(r => r.doctor))].filter(Boolean).sort());
     });
-  }, [docSearch, selectedStates, selectedHospital]);
+  }, [docSearch, selectedStates, selectedHospital, user, profile]);
 
   // ── View logic ─────────────────────────────────────────
   const isDocView   = !selectedDoctor;
@@ -74,15 +91,21 @@ export default function App() {
   const regionLabel = isDocView ? "Region" : "Location";
 
   // ── State filter helper ────────────────────────────────
-  const applyStateFilter = (q) => {
-    if (selectedStates.length === 1) return q.eq("state", selectedStates[0]);
-    if (selectedStates.length > 1)  return q.in("state", selectedStates);
-    return q;
-  };
+  const applyStateFilter = useCallback((q) => {
+    const regionalAllowed = profile?.role === "regional" ? profile.allowed_states : null;
+    const active = selectedStates.length > 0 ? selectedStates : regionalAllowed;
+    if (!active || active.length === 0) return q;
+    if (active.length === 1) return q.eq("state", active[0]);
+    return q.in("state", active);
+  }, [selectedStates, profile]);
 
   // ── Load true totals ───────────────────────────────────
   const loadTotals = useCallback(async () => {
-    if (selectedStates.length === 0 && !selectedHospital && !selectedDoctor) {
+    if (!user || !profile || profile.role === "pending") return;
+    const isRegional = profile.role === "regional";
+    const hasFilter = selectedStates.length > 0 || selectedHospital || selectedDoctor || isRegional;
+
+    if (!hasFilter) {
       const { data } = productFilter !== "All"
         ? await supabase.from("national_totals").select("product, total_qty").eq("product", productFilter)
         : await supabase.from("national_totals").select("product, total_qty");
@@ -104,12 +127,13 @@ export default function App() {
       kneeQty:  data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0),
       hipQty:   data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0),
     });
-  }, [selectedStates, selectedHospital, selectedDoctor, productFilter]); // eslint-disable-line
+  }, [selectedStates, selectedHospital, selectedDoctor, productFilter, user, profile, applyStateFilter]);
 
   useEffect(() => { loadTotals(); }, [loadTotals]);
 
   // ── Load paginated results ─────────────────────────────
   const loadResults = useCallback(async () => {
+    if (!user || !profile || profile.role === "pending") return;
     setLoading(true);
     setError(null);
     try {
@@ -148,7 +172,7 @@ export default function App() {
       setError("Failed to load data from Supabase.");
     }
     setLoading(false);
-  }, [selectedStates, selectedHospital, selectedDoctor, productFilter, page, sortCol, sortDir, statsView, nameKey]); // eslint-disable-line
+  }, [selectedStates, selectedHospital, selectedDoctor, productFilter, page, sortCol, sortDir, statsView, nameKey, user, profile, applyStateFilter]);
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
@@ -210,17 +234,65 @@ export default function App() {
   const filtStates = allStates.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase()));
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasFilter  = selectedStates.length > 0 || selectedHospital || selectedDoctor;
-  const isNational = selectedStates.length === 0 && !selectedHospital && !selectedDoctor;
+  const isNational = selectedStates.length === 0 && !selectedHospital && !selectedDoctor && profile?.role !== "regional";
 
+  // ── Auth gates (after all hooks) ──────────────────────
+  if (authLoading) return (
+    <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+        <div style={{ fontSize: 15, color: "#64748b" }}>Loading…</div>
+      </div>
+    </div>
+  );
+
+  if (!user) return <LoginPage />;
+
+  if (profile?.role === "pending") return (
+    <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%)", padding: "20px 28px", color: "#fff" }}>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>🦴 Knee & Hip Volume Dashboard</div>
+        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>Sales View · Maxx Orthopedics</div>
+      </div>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#fff", borderRadius: 16, padding: "48px 56px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", textAlign: "center", maxWidth: 440 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Access Pending</div>
+          <div style={{ fontSize: 14, color: "#64748b", marginBottom: 24 }}>Your account is awaiting admin approval. You'll receive access shortly.</div>
+          <button onClick={signOut} style={{ background: "#f1f5f9", color: "#374151", padding: "10px 24px", borderRadius: 8, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Sign Out</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (showAdmin && profile?.role === "admin") return <AdminDashboard onExit={() => setShowAdmin(false)} />;
+
+  // ── Main dashboard ─────────────────────────────────────
   return (
     <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
       {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%)", padding: "16px 28px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>🦴 Knee & Hip Volume Dashboard</div>
-          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>Total Industry Data · Maxx Orthopedics</div>
+          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>
+            Sales View · Maxx Orthopedics
+            {profile?.user_type && (
+              <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.2)", padding: "1px 8px", borderRadius: 20, fontSize: 11 }}>
+                {profile.user_type === "maxx_employee" ? "Maxx Employee" : "Distributor"}
+              </span>
+            )}
+            {profile?.role === "regional" && profile?.allowed_states?.length > 0 && (
+              <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.8 }}>· {profile.allowed_states.join(", ")}</span>
+            )}
+          </div>
         </div>
-        <button onClick={() => { loadResults(); loadTotals(); }} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>↻ Refresh</button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { loadResults(); loadTotals(); }} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>↻ Refresh</button>
+          {profile?.role === "admin" && (
+            <button onClick={() => setShowAdmin(true)} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>⚙️ Admin</button>
+          )}
+          <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>Sign Out</button>
+        </div>
       </div>
 
       <div style={{ padding: "20px 24px", maxWidth: 1200, margin: "0 auto" }}>
@@ -349,9 +421,9 @@ export default function App() {
               </thead>
               <tbody>
                 {rows.map((row, i) => {
-                  const name           = row[nameKey];
-                  const detail         = expandedDetail[name];
-                  const isPaymentOpen  = paymentDoctor === name;
+                  const name          = row[nameKey];
+                  const detail        = expandedDetail[name];
+                  const isPaymentOpen = paymentDoctor === name;
                   return (
                     <>
                       <tr key={name + i} style={{ borderTop: "1px solid #f1f5f9", background: isPaymentOpen ? "#f0f9ff" : i % 2 === 0 ? "#fff" : "#fafafa" }}>
@@ -408,7 +480,7 @@ export default function App() {
         </div>
 
         {/* Standalone CMS section when a specific doctor is selected */}
-        {selectedDoctor && (
+        {selectedDoctor && selectedDoctor.trim() !== "" && (
           <PaymentPanel doctor={selectedDoctor} />
         )}
       </div>
