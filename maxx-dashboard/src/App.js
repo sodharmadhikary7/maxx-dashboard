@@ -171,7 +171,7 @@ export default function App() {
       setError("Failed to load data from Supabase.");
     }
     setLoading(false);
-  }, [selectedStates, selectedHospital, selectedDoctor, productFilter, page, sortCol, sortDir, statsView, nameKey, user, profile, applyStateFilter]);
+  }, [selectedStates, selectedHospital, selectedDoctor, productFilter, page, sortCol, sortDir, statsView, nameKey, user, profile, applyStateFilter]); // eslint-disable-line
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
