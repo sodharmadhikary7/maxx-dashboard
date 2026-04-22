@@ -92,12 +92,11 @@ export default function App() {
 
   // ── State filter helper ────────────────────────────────
   const applyStateFilter = useCallback((q) => {
-    const regionalAllowed = profile?.role === "regional" ? profile.allowed_states : null;
-    const active = selectedStates.length > 0 ? selectedStates : regionalAllowed;
-    if (!active || active.length === 0) return q;
-    if (active.length === 1) return q.eq("state", active[0]);
-    return q.in("state", active);
-  }, [selectedStates, profile]);
+    const states = profile?.role === "regional" ? profile.allowed_states : selectedStates;
+    if (!states || states.length === 0) return q;
+    if (states.length === 1) return q.eq("state", states[0]);
+    return q.in("state", states);
+  }, [selectedStates, profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load true totals ───────────────────────────────────
   const loadTotals = useCallback(async () => {
