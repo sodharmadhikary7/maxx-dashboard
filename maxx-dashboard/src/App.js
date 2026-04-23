@@ -4,6 +4,7 @@ import PaymentPanel from "./components/PaymentPanel";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import "./mobile.css";
 
 const fmtN = n => n == null ? "-" : Number(n).toLocaleString();
 const PAGE_SIZE = 100;
@@ -25,7 +26,6 @@ function DoctorDetailPanel({ doctor }) {
       .then(({ data: rows }) => { setData(rows || []); setLoading(false); });
   }, [doctor]);
 
-  // By surgery type
   const byType = {};
   data.forEach(r => {
     if (!byType[r.surgery]) byType[r.surgery] = { surgery: r.surgery, product: r.product, total: 0 };
@@ -36,7 +36,6 @@ function DoctorDetailPanel({ doctor }) {
   const kneeTotal   = data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.qty || 0), 0);
   const hipTotal    = data.filter(r => r.product === "Hip").reduce((s, r)  => s + (r.qty || 0), 0);
 
-  // By state & county
   const byStateCounty = {};
   data.forEach(r => {
     const key = `${r.state}__${r.county || "Unknown"}`;
@@ -47,7 +46,6 @@ function DoctorDetailPanel({ doctor }) {
   });
   const stateCountyRows = Object.values(byStateCounty).sort((a, b) => a.state < b.state ? -1 : a.state > b.state ? 1 : b.total - a.total);
 
-  // By hospital
   const byHospital = {};
   data.forEach(r => {
     const key = r.hospital || "Unknown";
@@ -75,12 +73,11 @@ function DoctorDetailPanel({ doctor }) {
       </button>
 
       {open && (
-        <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1.5fr 1.5fr", gap: 20 }}>
+        <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1.5fr 1.5fr", gap: 20 }} className="detail-grid">
           {loading ? (
             <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 24, color: "#94a3b8" }}>⏳ Loading…</div>
           ) : (
             <>
-              {/* By Surgery Type */}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By Surgery Type</div>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -102,7 +99,6 @@ function DoctorDetailPanel({ doctor }) {
                 </table>
               </div>
 
-              {/* By State & County */}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By State & County</div>
                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
@@ -131,7 +127,6 @@ function DoctorDetailPanel({ doctor }) {
                 </div>
               </div>
 
-              {/* By Hospital */}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By Hospital</div>
                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
@@ -305,7 +300,6 @@ export default function App() {
 
   const loadDetail = async (name) => {
     if (expandedRow === name) { setExpandedRow(null); return; }
-    if (expandedDetail[name]) { setExpandedRow(name); return; }
     setExpandedDetail(prev => ({ ...prev, [name]: true }));
     setExpandedRow(name);
   };
@@ -357,25 +351,27 @@ export default function App() {
   return (
     <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%)", padding: "16px 28px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>🦴 Knee & Hip Volume Dashboard</div>
-          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>
-            Sales View · Maxx Orthopedics
-            {profile?.user_type && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.2)", padding: "1px 8px", borderRadius: 20, fontSize: 11 }}>{profile.user_type === "maxx_employee" ? "Maxx Employee" : "Distributor"}</span>}
-            {profile?.role === "regional" && profile?.allowed_states?.length > 0 && <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.8 }}>· {profile.allowed_states.join(", ")}</span>}
+      <div style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%)", padding: "16px 28px", color: "#fff" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }} className="header-inner">
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>🦴 Knee & Hip Volume Dashboard</div>
+            <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2 }}>
+              Sales View · Maxx Orthopedics
+              {profile?.user_type && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.2)", padding: "1px 8px", borderRadius: 20, fontSize: 11 }}>{profile.user_type === "maxx_employee" ? "Maxx Employee" : "Distributor"}</span>}
+              {profile?.role === "regional" && profile?.allowed_states?.length > 0 && <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.8 }}>· {profile.allowed_states.join(", ")}</span>}
+            </div>
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => { loadResults(); loadTotals(); }} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>↻ Refresh</button>
-          {profile?.role === "admin" && <button onClick={() => setShowAdmin(true)} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>⚙️ Admin</button>}
-          <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>Sign Out</button>
+          <div style={{ display: "flex", gap: 10 }} className="header-buttons">
+            <button onClick={() => { loadResults(); loadTotals(); }} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>↻ Refresh</button>
+            {profile?.role === "admin" && <button onClick={() => setShowAdmin(true)} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>⚙️ Admin</button>}
+            <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", padding: "7px 16px", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)" }}>Sign Out</button>
+          </div>
         </div>
       </div>
 
-      <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }} className="main-content">
         {/* Filter panels */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 16 }} className="filter-grid">
           {[
             { label: "State",    items: filtStates,   search: stateSearch,  setSearch: setStateSearch,  selected: selectedStates,    onSelect: s => { toggle(setSelectedStates, s); setSelectedCounties([]); setSelectedHospitals([]); setSelectedDoctors([]); setPage(0); setCountySearch(""); setHospSearch(""); setDocSearch(""); }, color: "#2563eb", placeholder: "Search states…", hint: "" },
             { label: "County",   items: allCounties,  search: countySearch, setSearch: setCountySearch, selected: selectedCounties,   onSelect: s => { toggle(setSelectedCounties, s); setSelectedHospitals([]); setSelectedDoctors([]); setPage(0); }, color: "#0891b2", placeholder: selectedStates.length > 0 ? "Search counties…" : "Select a state first…", hint: selectedStates.length === 0 && countySearch.length < 2 ? "Select a state or type to search" : "" },
@@ -399,12 +395,12 @@ export default function App() {
         </div>
 
         {/* Product + active tags */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }} className="product-row">
           <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Product:</span>
           {["All", "Knee", "Hip"].map(p => <FilterBtn key={p} val={p} active={productFilter === p} onClick={() => { setProductFilter(p); setPage(0); }} color="#0f172a" />)}
           <div style={{ flex: 1 }} />
           {hasFilter && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }} className="filter-tags">
               {selectedStates.map(s    => <span key={s} onClick={() => toggle(setSelectedStates,    s)} style={{ background: "#dbeafe", color: "#1e40af", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {s} ✕</span>)}
               {selectedCounties.map(s  => <span key={s} onClick={() => toggle(setSelectedCounties,  s)} style={{ background: "#cffafe", color: "#0e7490", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🏘️ {s} ✕</span>)}
               {selectedHospitals.map(s => <span key={s} onClick={() => toggle(setSelectedHospitals, s)} style={{ background: "#ede9fe", color: "#5b21b6", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🏥 {s} ✕</span>)}
@@ -415,7 +411,7 @@ export default function App() {
         </div>
 
         {/* KPI cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 18 }} className="kpi-grid">
           {[
             { label: isNational ? "Total Cases (National)" : "Total Cases", val: fmtN(totals.totalQty), color: "#2563eb" },
             { label: isNational ? "Knee Cases (National)"  : "Knee Cases",  val: fmtN(totals.kneeQty),  color: "#7c3aed" },
@@ -428,7 +424,7 @@ export default function App() {
           ))}
         </div>
 
-        {/* Results table — hidden when specific doctors are selected */}
+        {/* Results table */}
         {selectedDoctors.length === 0 && (
           <div style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
             <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
@@ -436,7 +432,7 @@ export default function App() {
                 <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>Results by {groupLabel} </span>
                 <span style={{ fontWeight: 400, color: "#94a3b8", fontSize: 13 }}>({rows.length} shown · {totalCount.toLocaleString()} total)</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }} className="pagination">
                 {loading && <span style={{ fontSize: 12, color: "#64748b" }}>Loading…</span>}
                 {totalPages > 1 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -447,7 +443,7 @@ export default function App() {
                 )}
               </div>
             </div>
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto" }} className="table-wrapper">
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>

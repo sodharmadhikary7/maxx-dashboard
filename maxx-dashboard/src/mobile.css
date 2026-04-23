@@ -1,0 +1,97 @@
+/* ── Mobile styles for iPhone ─────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Header */
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .header-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+  .header-buttons button {
+    flex: 1;
+    min-width: 80px;
+    font-size: 13px !important;
+    padding: 9px 10px !important;
+  }
+
+  /* Filter grid — stack to 1 column */
+  .filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Filter panels — larger tap targets */
+  .filter-grid button {
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+    min-height: 36px;
+  }
+
+  /* Filter search inputs */
+  .filter-grid input {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    padding: 10px !important;
+  }
+
+  /* Product filter row */
+  .product-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .product-row button {
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    min-height: 36px;
+  }
+
+  /* KPI cards — 1 column on very small screens */
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Results table — horizontal scroll */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-wrapper table {
+    min-width: 500px;
+  }
+  .table-wrapper td, .table-wrapper th {
+    white-space: nowrap;
+  }
+
+  /* Doctor detail panel — stack to 1 column */
+  .detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Pagination buttons */
+  .pagination button {
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+    min-height: 36px;
+  }
+
+  /* Active filter tags — smaller */
+  .filter-tags span {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
+
+  /* Main content padding */
+  .main-content {
+    padding: 12px 12px !important;
+  }
+
+  /* Results table buttons */
+  .table-wrapper button {
+    min-height: 34px;
+    padding: 6px 10px !important;
+  }
+}
