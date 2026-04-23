@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Maxx Dashboard",
+  "name": "Maxx Orthopedics Sales Dashboard",
+  "description": "Knee & Hip surgical volume intelligence for Maxx Orthopedics sales team",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,19 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1e3a5f",
+  "background_color": "#f8fafc",
+  "orientation": "portrait-primary"
 }
