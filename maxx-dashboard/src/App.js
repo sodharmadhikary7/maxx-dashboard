@@ -175,7 +175,6 @@ export default function App() {
   const [sortCol,        setSortCol]        = useState("total_qty");
   const [sortDir,        setSortDir]        = useState("desc");
   const [expandedRow,    setExpandedRow]    = useState(null);
-  const [expandedDetail, setExpandedDetail] = useState({});
   const [paymentDoctor,  setPaymentDoctor]  = useState(null);
   const [stateSearch,    setStateSearch]    = useState("");
   const [countySearch,   setCountySearch]   = useState("");
@@ -300,7 +299,6 @@ export default function App() {
 
   const loadDetail = async (name) => {
     if (expandedRow === name) { setExpandedRow(null); return; }
-    setExpandedDetail(prev => ({ ...prev, [name]: true }));
     setExpandedRow(name);
   };
 
@@ -318,7 +316,7 @@ export default function App() {
 
   const clearAll = () => {
     setSelectedStates([]); setSelectedCounties([]); setSelectedHospitals([]); setSelectedDoctors([]);
-    setExpandedRow(null); setExpandedDetail({}); setPaymentDoctor(null); setPage(0);
+    setExpandedRow(null); setPaymentDoctor(null); setPage(0);
     setStateSearch(""); setCountySearch(""); setHospSearch(""); setDocSearch("");
   };
 
