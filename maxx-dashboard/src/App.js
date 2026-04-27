@@ -10,7 +10,7 @@ const fmtN = n => n == null ? "-" : Number(n).toLocaleString();
 const PAGE_SIZE = 100;
 
 // ── Doctor Detail Panel ────────────────────────────────────
-function DoctorDetailPanel({ doctor }) {
+function DoctorDetailPanel({ doctor, facilityFilter = "All" }) {
   const [data,    setData]    = useState([]);
   const [open,    setOpen]    = useState(true);
   const [loading, setLoading] = useState(true);
@@ -19,12 +19,13 @@ function DoctorDetailPanel({ doctor }) {
     if (!doctor) return;
     setLoading(true);
     setData([]);
-    supabase
+    let q = supabase
       .from("surgeon_data")
-      .select("surgery, product, state, county, hospital, qty")
-      .eq("doctor", doctor)
-      .then(({ data: rows }) => { setData(rows || []); setLoading(false); });
-  }, [doctor]);
+      .select("surgery, product, state, county, hospital, facility_type, qty")
+      .eq("doctor", doctor);
+    if (facilityFilter !== "All") q = q.eq("facility_type", facilityFilter);
+    q.then(({ data: rows }) => { setData(rows || []); setLoading(false); });
+  }, [doctor, facilityFilter]);
 
   const byType = {};
   data.forEach(r => {
@@ -49,7 +50,7 @@ function DoctorDetailPanel({ doctor }) {
   const byHospital = {};
   data.forEach(r => {
     const key = r.hospital || "Unknown";
-    if (!byHospital[key]) byHospital[key] = { hospital: key, total: 0, knee: 0, hip: 0 };
+    if (!byHospital[key]) byHospital[key] = { hospital: key, facility_type: r.facility_type, total: 0, knee: 0, hip: 0 };
     byHospital[key].total += r.qty || 0;
     if (r.product === "Knee") byHospital[key].knee += r.qty || 0;
     if (r.product === "Hip")  byHospital[key].hip  += r.qty || 0;
@@ -61,13 +62,21 @@ function DoctorDetailPanel({ doctor }) {
   const tdR = { padding: "8px 12px", textAlign: "right",  fontSize: 13, color: "#374151" };
   const tdL = { ...tdR, textAlign: "left", fontWeight: 600, color: "#1e293b" };
 
+  const FacilityBadge = ({ type }) => (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20, whiteSpace: "nowrap",
+      background: type === "ASC" ? "#fef9c3" : "#dbeafe",
+      color:      type === "ASC" ? "#92400e" : "#1e40af",
+    }}>{type || "—"}</span>
+  );
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", marginTop: 4 }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "#f8fafc", border: "none", cursor: "pointer", borderBottom: open ? "1px solid #e2e8f0" : "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 14 }}>👨‍⚕️</span>
           <span style={{ fontWeight: 700, fontSize: 13, color: "#1e293b" }}>Case Summary — {doctor}</span>
-          {!loading && <span style={{ fontSize: 12, color: "#64748b" }}>{fmtN(grandTotal)} total cases</span>}
+          {!loading && <span style={{ fontSize: 12, color: "#64748b" }}>{fmtN(grandTotal)} total cases{facilityFilter !== "All" ? ` (${facilityFilter} only)` : ""}</span>}
         </div>
         <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>{open ? "▲ Hide" : "▼ Show"}</span>
       </button>
@@ -78,6 +87,7 @@ function DoctorDetailPanel({ doctor }) {
             <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 24, color: "#94a3b8" }}>⏳ Loading…</div>
           ) : (
             <>
+              {/* By Surgery Type */}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By Surgery Type</div>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -99,6 +109,7 @@ function DoctorDetailPanel({ doctor }) {
                 </table>
               </div>
 
+              {/* By State & County */}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By State & County</div>
                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
@@ -127,8 +138,12 @@ function DoctorDetailPanel({ doctor }) {
                 </div>
               </div>
 
+              {/* By Hospital — color coded */}
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>By Hospital</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>By Hospital</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <FacilityBadge type="Hospital" /><FacilityBadge type="ASC" />
+                </div>
                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead style={{ position: "sticky", top: 0 }}>
@@ -137,7 +152,12 @@ function DoctorDetailPanel({ doctor }) {
                     <tbody>
                       {hospitalRows.map((r, i) => (
                         <tr key={r.hospital} style={{ borderTop: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                          <td style={{ ...tdL, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.hospital}</td>
+                          <td style={{ ...tdL, maxWidth: 200 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <FacilityBadge type={r.facility_type} />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.hospital}</span>
+                            </div>
+                          </td>
                           <td style={{ ...tdR, fontWeight: 700, color: "#1e293b" }}>{fmtN(r.total)}</td>
                           <td style={{ ...tdR, color: "#7c3aed" }}>{fmtN(r.knee)}</td>
                           <td style={{ ...tdR, color: "#059669" }}>{fmtN(r.hip)}</td>
@@ -171,17 +191,18 @@ export default function App() {
   const [selectedHospitals, setSelectedHospitals] = useState([]);
   const [selectedDoctors,   setSelectedDoctors]   = useState([]);
   const [productFilter,     setProductFilter]     = useState("All");
+  const [facilityFilter,    setFacilityFilter]    = useState("All");
 
-  const [sortCol,        setSortCol]        = useState("total_qty");
-  const [sortDir,        setSortDir]        = useState("desc");
-  const [expandedRow,    setExpandedRow]    = useState(null);
-  const [paymentDoctor,  setPaymentDoctor]  = useState(null);
-  const [stateSearch,    setStateSearch]    = useState("");
-  const [countySearch,   setCountySearch]   = useState("");
-  const [hospSearch,     setHospSearch]     = useState("");
-  const [docSearch,      setDocSearch]      = useState("");
-  const [page,           setPage]           = useState(0);
-  const [totalCount,     setTotalCount]     = useState(0);
+  const [sortCol,       setSortCol]       = useState("total_qty");
+  const [sortDir,       setSortDir]       = useState("desc");
+  const [expandedRow,   setExpandedRow]   = useState(null);
+  const [paymentDoctor, setPaymentDoctor] = useState(null);
+  const [stateSearch,   setStateSearch]   = useState("");
+  const [countySearch,  setCountySearch]  = useState("");
+  const [hospSearch,    setHospSearch]    = useState("");
+  const [docSearch,     setDocSearch]     = useState("");
+  const [page,          setPage]          = useState(0);
+  const [totalCount,    setTotalCount]    = useState(0);
 
   const [allStates,    setAllStates]    = useState([]);
   const [allCounties,  setAllCounties]  = useState([]);
@@ -246,16 +267,18 @@ export default function App() {
     if (selectedCounties.length > 0)  q = selectedCounties.length  === 1 ? q.eq("county",   selectedCounties[0])  : q.in("county",   selectedCounties);
     if (selectedHospitals.length > 0) q = selectedHospitals.length === 1 ? q.eq("hospital", selectedHospitals[0]) : q.in("hospital", selectedHospitals);
     if (selectedDoctors.length > 0)   q = selectedDoctors.length   === 1 ? q.eq("doctor",   selectedDoctors[0])   : q.in("doctor",   selectedDoctors);
+    if (facilityFilter !== "All")     q = q.eq("facility_type", facilityFilter);
     return q;
-  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, profile]); // eslint-disable-line
+  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, facilityFilter, profile]); // eslint-disable-line
 
   const loadTotals = useCallback(async () => {
     if (!user || !profile || profile.role === "pending") return;
-    const hasFilter = selectedStates.length > 0 || selectedCounties.length > 0 || selectedHospitals.length > 0 || selectedDoctors.length > 0 || profile.role === "regional";
+    const hasFilter = selectedStates.length > 0 || selectedCounties.length > 0 || selectedHospitals.length > 0 || selectedDoctors.length > 0 || facilityFilter !== "All" || profile.role === "regional";
     if (!hasFilter) {
-      const { data } = productFilter !== "All"
-        ? await supabase.from("national_totals").select("product, total_qty").eq("product", productFilter)
-        : await supabase.from("national_totals").select("product, total_qty");
+      let q = supabase.from("national_totals").select("product, total_qty");
+      if (productFilter  !== "All") q = q.eq("product",       productFilter);
+      if (facilityFilter !== "All") q = q.eq("facility_type", facilityFilter);
+      const { data } = await q;
       if (data) setTotals({ totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0), kneeQty: data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0), hipQty: data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0) });
       return;
     }
@@ -264,7 +287,7 @@ export default function App() {
     if (productFilter !== "All") q = q.eq("product", productFilter);
     const { data } = await q;
     if (data) setTotals({ totalQty: data.reduce((s, r) => s + (r.total_qty || 0), 0), kneeQty: data.filter(r => r.product === "Knee").reduce((s, r) => s + (r.total_qty || 0), 0), hipQty: data.filter(r => r.product === "Hip").reduce((s, r) => s + (r.total_qty || 0), 0) });
-  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, productFilter, user, profile, applyFilters]); // eslint-disable-line
+  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, facilityFilter, productFilter, user, profile, applyFilters]); // eslint-disable-line
 
   useEffect(() => { loadTotals(); }, [loadTotals]);
 
@@ -293,7 +316,7 @@ export default function App() {
       }
     } catch (e) { setError("Failed to load data from Supabase."); }
     setLoading(false);
-  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, productFilter, page, sortCol, sortDir, nameKey, user, profile, applyFilters]); // eslint-disable-line
+  }, [selectedStates, selectedCounties, selectedHospitals, selectedDoctors, facilityFilter, productFilter, page, sortCol, sortDir, nameKey, user, profile, applyFilters]); // eslint-disable-line
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
@@ -317,6 +340,7 @@ export default function App() {
   const clearAll = () => {
     setSelectedStates([]); setSelectedCounties([]); setSelectedHospitals([]); setSelectedDoctors([]);
     setExpandedRow(null); setPaymentDoctor(null); setPage(0);
+    setFacilityFilter("All"); setProductFilter("All");
     setStateSearch(""); setCountySearch(""); setHospSearch(""); setDocSearch("");
   };
 
@@ -327,7 +351,7 @@ export default function App() {
   const filtStates = allStates.filter(s => s.toLowerCase().includes(stateSearch.toLowerCase()));
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasFilter  = selectedStates.length > 0 || selectedCounties.length > 0 || selectedHospitals.length > 0 || selectedDoctors.length > 0;
-  const isNational = !hasFilter && profile?.role !== "regional";
+  const isNational = !hasFilter && facilityFilter === "All" && productFilter === "All" && profile?.role !== "regional";
 
   if (authLoading) return <div style={{ fontFamily: "Inter,sans-serif", background: "#f8fafc", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div><div style={{ fontSize: 15, color: "#64748b" }}>Loading…</div></div></div>;
   if (!user) return <LoginPage />;
@@ -392,10 +416,13 @@ export default function App() {
           ))}
         </div>
 
-        {/* Product + active tags */}
+        {/* Product + Facility filter + active tags */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }} className="product-row">
           <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Product:</span>
           {["All", "Knee", "Hip"].map(p => <FilterBtn key={p} val={p} active={productFilter === p} onClick={() => { setProductFilter(p); setPage(0); }} color="#0f172a" />)}
+          <span style={{ width: 1, background: "#e2e8f0", alignSelf: "stretch", margin: "0 4px" }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Facility:</span>
+          {["All", "Hospital", "ASC"].map(f => <FilterBtn key={f} val={f} active={facilityFilter === f} onClick={() => { setFacilityFilter(f); setPage(0); }} color="#b45309" />)}
           <div style={{ flex: 1 }} />
           {hasFilter && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }} className="filter-tags">
@@ -485,7 +512,7 @@ export default function App() {
                         {isExpanded && (
                           <tr key={name + i + "_exp"}>
                             <td colSpan={isDocView ? 7 : 6} style={{ padding: "0 16px 16px 16px", background: "#f8fafc" }}>
-                              {isDocView && <DoctorDetailPanel doctor={name} />}
+                              {isDocView && <DoctorDetailPanel doctor={name} facilityFilter={facilityFilter} />}
                             </td>
                           </tr>
                         )}
@@ -510,7 +537,7 @@ export default function App() {
         {/* Doctor detail + CMS payments for filter-selected doctors */}
         {selectedDoctors.map(doc => (
           <div key={doc}>
-            <DoctorDetailPanel doctor={doc} />
+            <DoctorDetailPanel doctor={doc} facilityFilter={facilityFilter} />
             <PaymentPanel doctor={doc} />
           </div>
         ))}
